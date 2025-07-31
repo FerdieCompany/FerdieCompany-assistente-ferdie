@@ -1,54 +1,59 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import OpenAI from "openai";
-import fs from "fs";
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import OpenAI from 'openai';
+import fs from 'fs';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-let conteudoSite = "";
-try {
-  conteudoSite = fs.readFileSync("./conteudo_ferdie_renderizado.json", "utf8");
-  console.log("✅ Conteúdo renderizado carregado com sucesso.");
-} catch (erro) {
-  console.error("Erro ao ler o conteúdo do site:", erro);
-}
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ✅ Carregando conteúdo do site
+const conteudoFerdie = require('./conteudo_ferdie_renderizado.json');
+console.log('📘 Conteúdo renderizado carregado com sucesso.');
 
-app.post("/assistente", async (req, res) => {
-  const mensagem = req.body.mensagem;
+app.post('/assistente', async (req, res) => {
+  const mensagemUsuario = req.body.mensagem;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const chatCompletion = await openai.chat.completions.create({
       messages: [
         {
-          role: "system",
-          content: `Você é o Assistente Ferdie, sensível e empático. Responda com base neste conteúdo real do site Ferdie:\n\n${conteudoSite}`,
+          role: 'system',
+          content: `
+Você é o Assistente Ferdie, um especialista sensível e empático que ajuda pessoas a escolherem joias no site da Ferdie. 
+Você responde com gentileza, sensibilidade e linguagem poética quando necessário.
+
+Use apenas o conteúdo a seguir como referência (conteúdo do site Ferdie):
+
+"""${JSON.stringify(conteudoFerdie)}"""
+
+Se a resposta não estiver no conteúdo, diga com suavidade que não encontrou.
+`
         },
         {
-          role: "user",
-          content: mensagem,
-        },
+          role: 'user',
+          content: mensagemUsuario
+        }
       ],
-      temperature: 0.8,
+      model: 'gpt-4o',
+      temperature: 0.7
     });
 
-    const resposta = completion.choices[0]?.message?.content || "Desculpe, não consegui entender.";
+    const resposta = chatCompletion.choices[0].message.content;
     res.json({ resposta });
   } catch (erro) {
-    console.error("Erro ao gerar resposta:", erro);
-    res.status(500).json({ resposta: "Desculpe, houve um erro ao responder." });
+    console.error('Erro na geração da resposta:', erro);
+    res.status(500).json({ resposta: 'Desculpe, houve um erro ao gerar a resposta.' });
   }
 });
 
-app.listen(PORT, () => {
-  c
+const PORTA = process.env.PORT || 3000;
+app.listen(PORTA, () => {
+  console.log(`✨ Assistente Ferdie online em http://localhost:${PORTA}`);
+});
