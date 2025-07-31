@@ -1,74 +1,54 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const fs = require("fs");
-const { Configuration, OpenAIApi } = require("openai");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import OpenAI from "openai";
+import fs from "fs";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(cors());
+app.use(express.json());
 
-// Configurar a chave da OpenAI a partir da variável de ambiente
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY
-});
-const openai = new OpenAIApi(configuration);
-
-// Middleware
-app.use(bodyParser.json());
-
-// Carrega o conteúdo do JSON uma vez ao iniciar
-let conteudoFerdie = "";
+let conteudoSite = "";
 try {
-  const rawData = fs.readFileSync("conteudo_ferdie.json", "utf8");
-  const jsonData = JSON.parse(rawData);
-
-  conteudoFerdie = Object.values(jsonData)
-    .map(secao => secao.titulo + "\n" + secao.texto)
-    .join("\n\n");
-} catch (err) {
-  console.error("Erro ao carregar o conteúdo Ferdie:", err);
-  conteudoFerdie = "";
+  conteudoSite = fs.readFileSync("./conteudo_ferdie_renderizado.json", "utf8");
+  console.log("✅ Conteúdo renderizado carregado com sucesso.");
+} catch (erro) {
+  console.error("Erro ao ler o conteúdo do site:", erro);
 }
 
-// Rota principal
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 app.post("/assistente", async (req, res) => {
   const mensagem = req.body.mensagem;
 
-  if (!mensagem) {
-    return res.status(400).json({ resposta: "Mensagem ausente." });
-  }
-
   try {
-    const prompt = `
-Você é o Assistente Ferdie, um curador sensível e poético da joalheria Ferdie.
-Abaixo está o conteúdo real do site da marca. Use esse conteúdo como base para responder com empatia e sofisticação ao cliente.
-
-CONTEÚDO DO SITE:
-${conteudoFerdie}
-
-Agora, responda à seguinte pergunta do cliente com base nesse conteúdo:
-
-"${mensagem}"
-`;
-
-    const respostaIA = await openai.createChatCompletion({
-      model: "gpt-4",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: [
-        { role: "system", content: "Você é um assistente sensível e sofisticado da joalheria Ferdie." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content: `Você é o Assistente Ferdie, sensível e empático. Responda com base neste conteúdo real do site Ferdie:\n\n${conteudoSite}`,
+        },
+        {
+          role: "user",
+          content: mensagem,
+        },
       ],
       temperature: 0.8,
-      max_tokens: 500
     });
 
-    const resposta = respostaIA.data.choices[0].message.content.trim();
+    const resposta = completion.choices[0]?.message?.content || "Desculpe, não consegui entender.";
     res.json({ resposta });
-  } catch (error) {
-    console.error("Erro ao gerar resposta:", error.message);
+  } catch (erro) {
+    console.error("Erro ao gerar resposta:", erro);
     res.status(500).json({ resposta: "Desculpe, houve um erro ao responder." });
   }
 });
 
-// Inicia o servidor
 app.listen(PORT, () => {
-  console.log(`Assistente Ferdie rodando em http://localhost:${PORT}`);
-});
+  c
