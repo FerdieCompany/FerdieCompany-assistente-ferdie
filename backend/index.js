@@ -1,45 +1,63 @@
-const express = require("express");
-const cors = require("cors");
-const OpenAI = require("openai");
-require("dotenv").config();
+import dotenv from 'dotenv';
+import express from 'express';
+import fs from 'fs';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import OpenAI from 'openai';
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.post("/assistente", async (req, res) => {
-  const { pergunta } = req.body;
-  if (!pergunta) {
-    return res.status(400).json({ erro: "Pergunta não fornecida." });
-  }
+let conteudoFerdie = '';
+try {
+  conteudoFerdie = fs.readFileSync('./conteudo_ferdie_renderizado.json', 'utf8');
+  console.log('📘 Conteúdo renderizado carregado com sucesso.');
+} catch (erro) {
+  console.error('Erro ao carregar o conteúdo renderizado:', erro);
+}
+
+app.post('/assistente', async (req, res) => {
+  const mensagemUsuario = req.body.mensagem;
 
   try {
-    const resposta = await openai.chat.completions.create({
-      model: "gpt-4",
+    const chatCompletion = await openai.chat.completions.create({
       messages: [
         {
-          role: "system",
-          content: "Você é o Assistente Ferdie, um curador sensível de joias com alma. Responda com empatia e elegância.",
+          role: 'system',
+          content: `
+Você é o Assistente Ferdie, um especialista sensível e empático que ajuda pessoas a escolherem joias no site da Ferdie. 
+Você responde com gentileza, sensibilidade e linguagem poética quando necessário.
+
+Use apenas o conteúdo a seguir como referência (conteúdo do site Ferdie):
+
+"""${conteudoFerdie}"""
+
+Se a resposta não estiver no conteúdo, diga com suavidade que não encontrou.
+`
         },
         {
-          role: "user",
-          content: pergunta,
-        },
+          role: 'user',
+          content: mensagemUsuario
+        }
       ],
+      model: 'gpt-4o',
+      temperature: 0.7
     });
 
-    res.json({ resposta: resposta.choices[0].message.content });
+    const resposta = chatCompletion.choices[0].message.content;
+    res.json({ resposta });
   } catch (erro) {
-    console.error("Erro OpenAI:", erro.response?.data || erro.message);
-    res.status(500).json({ erro: "Erro ao gerar resposta." });
+    console.error('Erro na geração da resposta:', erro);
+    res.status(500).json({ resposta: 'Desculpe, houve um erro ao gerar a resposta.' });
   }
 });
 
-const port = process.env.PORT || 10000;
-app.listen(port, () => {
-  console.log("Assistente Ferdie rodando em http://localhost:" + port);
+const PORTA = process.env.PORT || 3000;
+app.listen(PORTA, () => {
+  console.log(`✨ Assistente Ferdie online em http://localhost:${PORTA}`);
 });
