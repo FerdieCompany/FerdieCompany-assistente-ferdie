@@ -21,6 +21,11 @@ try {
   console.error('Erro ao carregar o conteúdo renderizado:', erro);
 }
 
+// 🔁 Função que converte [Texto](URL) em <a href="URL">Texto</a>
+function transformarLinksEmHTML(texto) {
+  return texto.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+
 app.post('/assistente', async (req, res) => {
   const mensagemUsuario = req.body.mensagem;
 
@@ -49,7 +54,9 @@ Se a resposta não estiver no conteúdo, diga com suavidade que não encontrou.
       temperature: 0.7
     });
 
-    const resposta = chatCompletion.choices[0].message.content;
+    const respostaBruta = chatCompletion.choices[0].message.content;
+    const resposta = transformarLinksEmHTML(respostaBruta); // ✅ conversão aplicada aqui
+
     res.json({ resposta });
   } catch (erro) {
     console.error('Erro na geração da resposta:', erro);
@@ -61,3 +68,4 @@ const PORTA = process.env.PORT || 3000;
 app.listen(PORTA, () => {
   console.log(`✨ Assistente Ferdie online em http://localhost:${PORTA}`);
 });
+
